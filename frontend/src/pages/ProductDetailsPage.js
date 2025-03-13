@@ -99,7 +99,7 @@ export default function ProductDetailsPage() {
                 {Object.keys(record).map((key) => 
                   key !== "pharm_classes" && ( 
                     <Typography key={key} sx={{ textAlign: 'left', marginBottom: 1 }}>
-                      <strong>{key}:</strong> {record[key] ? record[key].toString() : "N/A"}
+                      <strong>{key.replace(/_/g, ' ').toUpperCase()}:</strong> {record[key] ? record[key].toString() : "N/A"}
                     </Typography>
                   )
                 )}
