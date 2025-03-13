@@ -63,7 +63,7 @@ export default function ImmunogenicityDetailsPage() {
             ) : record && Object.keys(record).length > 0 ? (
               Object.keys(record).map((key) => (
                 <Typography key={key} sx={{ textAlign: 'left', marginBottom: 1 }}>
-                  <strong>{key}:</strong> {record[key] ? record[key].toString() : "N/A"}
+                  <strong>{key.replace(/_/g, ' ').toUpperCase()}:</strong> {record[key] ? record[key].toString() : "N/A"}
                 </Typography>
               ))
             ) : (
