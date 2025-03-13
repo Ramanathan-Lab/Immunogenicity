@@ -105,7 +105,8 @@ router.post('/search-main', async (req, res) => {
     let therapeuticQuery = `SELECT t_id, audit_status, proprietaryname, nonproprietaryname, unii, productid, ndcpackagecode FROM therapeutic WHERE TRIM(LOWER(proprietaryname)) = ANY($1)`;
     const { rows: therapeuticResults } = await pool.query(therapeuticQuery, [proprietaryNames]);
 
-    let immunogenicityQuery = `SELECT trial_idc_identifier, trial_external_identifier, proprietaryname, nonproprietaryname FROM trial WHERE TRIM(LOWER(proprietaryname)) ILIKE ANY($1)`;
+    let immunogenicityQuery = `SELECT t.trial_idc_identifier, t.trial_external_identifier, t.proprietaryname, t.nonproprietaryname, p.productid 
+  FROM trial t JOIN product p ON TRIM(LOWER(t.proprietaryname)) = TRIM(LOWER(p.proprietaryname)) WHERE TRIM(LOWER(t.proprietaryname)) ILIKE ANY($1)`;
     const { rows: immunogenicityResults } = await pool.query(immunogenicityQuery, [proprietaryNames.map(name => `%${name}%`)]);
 
     //const uniqueProprietaryNames = [...new Set(proprietaryNames.map(name => `%${name.toLowerCase().trim()}%`))];
@@ -254,9 +255,18 @@ router.get('/get-details', async (req, res) => {
       response.therapeutic = therapeuticData.length > 0 ? therapeuticData[0] : {};
     }
 
+    // Fetch full bla details
+    if (response.therapeutic?.proprietaryname) {
+      const blaQuery = `
+        SELECT * FROM bla 
+        WHERE $1 ILIKE ANY(STRING_TO_ARRAY(bla.proprietaryname, ';'))`;
+      const { rows: blaData } = await pool.query(blaQuery, [response.therapeutic.proprietaryname]);
+      response.bla = blaData;
+    }
+
     // Fetch full immunogenicity (trial) details
     if (productid) {
-      const trialQuery = `SELECT * FROM trial WHERE proprietaryname IN (SELECT proprietaryname FROM product WHERE productid = $1)`;
+      const trialQuery = `SELECT t.* FROM trial t JOIN product p ON TRIM(LOWER(t.proprietaryname)) = TRIM(LOWER(p.proprietaryname)) WHERE p.productid = $1`;
       const { rows: trialData } = await pool.query(trialQuery, [productid]);
       response.immunogenicity = trialData.length > 0 ? trialData[0] : {};
     }
@@ -267,6 +277,7 @@ router.get('/get-details', async (req, res) => {
       const { rows: packageData } = await pool.query(packageQuery, [ndcpackagecode]);
       response.package = packageData.length > 0 ? packageData[0] : {};
     }
+
 
     res.json(response);
   } catch (error) {
