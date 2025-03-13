@@ -5,14 +5,41 @@ import {
   Stack,
   IconButton,
   Box,
-  Typography
+  Typography,
+  useMediaQuery,
+  CircularProgress
 } from '@mui/material';
 import Autocomplete from '@mui/material/Autocomplete';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import axios from 'axios';
+import { styled } from '@mui/material/styles';
+
+const StyledButton = styled(Button)(({ theme }) => ({
+  textTransform: 'none',
+  borderRadius: '8px',
+  fontWeight: 500,
+  transition: 'all 0.3s ease',
+  '&:hover': {
+    transform: 'translateY(-1px)'
+  }
+}));
+
+const OperatorButton = styled(Button)(({ theme, active }) => ({
+  minWidth: '64px',
+  borderRadius: '6px',
+  fontWeight: 600,
+  border: active ? '2px solid transparent' : `2px solid ${theme.palette.primary.main}`,
+  backgroundColor: active ? theme.palette.primary.main : 'transparent',
+  color: active ? '#fff' : theme.palette.primary.main,
+  '&:hover': {
+    backgroundColor: active ? theme.palette.primary.dark : 'rgba(13, 59, 102, 0.08)'
+  }
+}));
 
 export default function SearchForm({ initialFilters, initialOrder, onSearch }) {
+  const isMobile = useMediaQuery('(max-width:600px)');
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [filters, setFilters] = useState(initialFilters);
   const [fieldsOrder, setFieldsOrder] = useState(initialOrder || Object.keys(initialFilters));
 
@@ -38,10 +65,13 @@ export default function SearchForm({ initialFilters, initialOrder, onSearch }) {
     }
 
     try {
+      setLoadingSuggestions(true);
       const res = await axios.get(`http://localhost:5000/api/suggestions?field=${field}&query=${query}`);
       setSuggestions((prev) => ({ ...prev, [field]: res.data || [] }));
     } catch (error) {
       console.error(error);
+    } finally {
+      setLoadingSuggestions(false);
     }
   };
 
@@ -84,70 +114,123 @@ export default function SearchForm({ initialFilters, initialOrder, onSearch }) {
   };
 
   const renderField = (label, fieldKey, index) => (
-    <Stack direction="row" spacing={1} alignItems="center" mb={1} key={fieldKey}>
-      {/* Autocomplete Input */}
-      <Box sx={{ flexGrow: 1 }}>
+    <Stack 
+      direction={isMobile ? 'column' : 'row'} 
+      spacing={1} 
+      alignItems="center" 
+      mb={2} 
+      key={fieldKey}
+      sx={{ width: '100%' }}
+    >
+      <Box sx={{ flexGrow: 1, width: '100%' }}>
         <Autocomplete
           freeSolo
           options={suggestions[fieldKey]}
+          loading={loadingSuggestions}
           value={filters[fieldKey].value}
           inputValue={filters[fieldKey].value}
           onChange={(event, newValue) => handleValueChange(fieldKey, newValue)}
           onInputChange={(event, newInputValue) => handleInputChange(fieldKey, newInputValue)}
           renderInput={(params) => (
-            <TextField {...params} label={label} variant="outlined" fullWidth size="small" />
+            <TextField
+              {...params}
+              label={label}
+              variant="filled"
+              fullWidth
+              InputProps={{
+                ...params.InputProps,
+                disableUnderline: true,
+                sx: {
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                  '&:hover': { backgroundColor: 'rgba(255, 255, 255, 1)' },
+                  transition: 'all 0.3s ease'
+                }
+              }}
+            />
           )}
-          sx={{ width: '100%' }}
+          sx={{
+            '& .MuiAutocomplete-popupIndicator': { borderRadius: '50%' },
+            '& .MuiAutocomplete-clearIndicator': { borderRadius: '50%' }
+          }}
         />
       </Box>
 
-      {/* AND/OR Buttons (Only for fields after the first one) */}
-      {index > 0 && (
-        <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>
-          <Button
-            size="small"
-            variant={filters[fieldKey].operator === 'AND' ? 'contained' : 'outlined'}
-            onClick={() => handleOperatorChange(fieldKey, 'AND')}
-          >
-            AND
-          </Button>
-          <Button
-            size="small"
-            variant={filters[fieldKey].operator === 'OR' ? 'contained' : 'outlined'}
-            onClick={() => handleOperatorChange(fieldKey, 'OR')}
-          >
-            OR
-          </Button>
-        </Stack>
-      )}
-
-      {/* Reordering Buttons */}
-      <Stack direction="column" spacing={0.5} sx={{ flexShrink: 0 }}>
+      <Stack 
+        direction={isMobile ? 'row' : 'column'} 
+        spacing={1} 
+        sx={{ 
+          flexShrink: 0,
+          width: isMobile ? '100%' : 'auto',
+          justifyContent: isMobile ? 'space-between' : 'flex-start'
+        }}
+      >
         {index > 0 && (
-          <IconButton onClick={() => handleReorder(index, 'up')} size="small">
-            <ArrowUpwardIcon fontSize="small" />
-          </IconButton>
+          <Stack direction="row" spacing={1}>
+            <OperatorButton
+              size="small"
+              active={filters[fieldKey].operator === 'AND'}
+              onClick={() => handleOperatorChange(fieldKey, 'AND')}
+            >
+              AND
+            </OperatorButton>
+            <OperatorButton
+              size="small"
+              active={filters[fieldKey].operator === 'OR'}
+              onClick={() => handleOperatorChange(fieldKey, 'OR')}
+            >
+              OR
+            </OperatorButton>
+          </Stack>
         )}
-        {index < fieldsOrder.length - 1 && (
-          <IconButton onClick={() => handleReorder(index, 'down')} size="small">
-            <ArrowDownwardIcon fontSize="small" />
-          </IconButton>
-        )}
+
+        <Stack direction="row" spacing={1}>
+          {index > 0 && (
+            <IconButton 
+              onClick={() => handleReorder(index, 'up')} 
+              size="small"
+              sx={{
+                backgroundColor: 'background.paper',
+                boxShadow: 1,
+                '&:hover': { 
+                  backgroundColor: 'primary.light',
+                  color: 'primary.contrastText'
+                }
+              }}
+            >
+              <ArrowUpwardIcon fontSize="small" />
+            </IconButton>
+          )}
+          {index < fieldsOrder.length - 1 && (
+            <IconButton 
+              onClick={() => handleReorder(index, 'down')} 
+              size="small"
+              sx={{
+                backgroundColor: 'background.paper',
+                boxShadow: 1,
+                '&:hover': { 
+                  backgroundColor: 'primary.light',
+                  color: 'primary.contrastText'
+                }
+              }}
+            >
+              <ArrowDownwardIcon fontSize="small" />
+            </IconButton>
+          )}
+        </Stack>
       </Stack>
     </Stack>
   );
 
   return (
-    <>
-      <Typography variant="h6" gutterBottom>
-        Search Form
-      </Typography>
+    <Box sx={{ p: 1 }}>
+      
 
       {fieldsOrder.map((fieldKey, index) =>
         renderField(
           {
-            productid: 'ProductId',
-            ndcpackagecode: 'NdcPackageCode',
+            productid: 'Product ID',
+            ndcpackagecode: 'NDC Package Code',
             unii: 'UNII',
             proprietaryname: 'Proprietary Name',
             nonproprietaryname: 'Non-Proprietary Name',
@@ -157,9 +240,21 @@ export default function SearchForm({ initialFilters, initialOrder, onSearch }) {
         )
       )}
 
-      <Button variant="contained" onClick={handleSubmit} sx={{ marginTop: 1, width: '100%' }} size="small">
-        Search
-      </Button>
-    </>
+      <StyledButton
+        variant="contained"
+        onClick={handleSubmit}
+        fullWidth
+        sx={{
+          py: 1.5,
+          fontWeight: 600,
+          background: 'linear-gradient(135deg, #0D3B66 0%, #1a5a8d 100%)',
+          '&:hover': {
+            boxShadow: '0 4px 12px rgba(13, 59, 102, 0.3)'
+          }
+        }}
+      >
+        Apply Filters
+      </StyledButton>
+    </Box>
   );
 }
